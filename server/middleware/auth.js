@@ -1,23 +1,27 @@
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 
-const auth = (req, res, next) => {
-  const token = req.header('x-auth-token');
-  if (!token) return res.status(401).json({ msg: 'No token, authorization denied' });
-
+const auth = async (req, res, next) => {
   try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ msg: "No token provided, authorization denied" });
+    }
+
+    const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded.user;
+    
+    // Fetch the user to ensure they still exist and get their latest role
+    const user = await User.findById(decoded.id).select("-password");
+    if (!user) {
+      return res.status(401).json({ msg: "Token is invalid, user not found" });
+    }
+
+    req.user = user;
     next();
   } catch (err) {
-    res.status(401).json({ msg: 'Token is not valid' });
+    res.status(401).json({ msg: "Token is not valid" });
   }
 };
 
-const checkRole = (role) => (req, res, next) => {
-  if (req.user.role !== role) {
-    return res.status(403).json({ msg: 'Access denied: Unauthorized role' });
-  }
-  next();
-};
-
-module.exports = { auth, checkRole };
+module.exports = auth;

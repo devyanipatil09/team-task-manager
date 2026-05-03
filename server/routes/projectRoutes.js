@@ -88,4 +88,32 @@ router.put("/:id/members", [auth, adminOnly], async (req, res) => {
   }
 });
 
+// @route   DELETE api/projects/:id
+// @desc    Delete a project and its associated tasks
+// @access  Private (Admin only)
+router.delete("/:id", [auth, adminOnly], async (req, res) => {
+  try {
+    const project = await Project.findById(req.params.id);
+    if (!project) return res.status(404).json({ msg: "Project not found" });
+
+    // Check if user owns the project
+    if (project.createdBy.toString() !== req.user.id) {
+      return res.status(401).json({ msg: "Not authorized to delete this project" });
+    }
+
+    // Cascade delete all tasks associated with this project
+    const Task = require("../models/Task");
+    await Task.deleteMany({ project: req.params.id });
+
+    await project.deleteOne();
+    res.json({ msg: "Project and associated tasks removed" });
+  } catch (err) {
+    console.error(err.message);
+    if (err.kind === "ObjectId") {
+      return res.status(404).json({ msg: "Project not found" });
+    }
+    res.status(500).send("Server Error");
+  }
+});
+
 module.exports = router;

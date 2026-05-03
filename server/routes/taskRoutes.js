@@ -23,7 +23,7 @@ router.post(
     }
 
     try {
-      const { title, description, project, assignedTo, dueDate } = req.body;
+      const { title, description, project, assignedTo, dueDate, priority } = req.body;
 
       // Verify project exists and belongs to admin
       const proj = await Project.findById(project);
@@ -38,6 +38,7 @@ router.post(
         project,
         assignedTo,
         dueDate,
+        priority: priority || "Medium",
         createdBy: req.user.id,
       });
 
@@ -144,6 +145,30 @@ router.get("/dashboard-stats", auth, async (req, res) => {
 
   } catch (err) {
     console.error(err.message);
+    res.status(500).send("Server Error");
+  }
+});
+
+// @route   DELETE api/tasks/:id
+// @desc    Delete a task
+// @access  Private (Admin only)
+router.delete("/:id", [auth, adminOnly], async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ msg: "Task not found" });
+
+    // Ensure the admin created this task
+    if (task.createdBy.toString() !== req.user.id) {
+      return res.status(401).json({ msg: "Not authorized to delete this task" });
+    }
+
+    await task.deleteOne();
+    res.json({ msg: "Task removed" });
+  } catch (err) {
+    console.error(err.message);
+    if (err.kind === "ObjectId") {
+      return res.status(404).json({ msg: "Task not found" });
+    }
     res.status(500).send("Server Error");
   }
 });
